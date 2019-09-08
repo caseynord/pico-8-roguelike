@@ -12,37 +12,42 @@ function _init()
 
     -- globals --
     frame_timer=0
-    plr_anim={240,241,242,243}
+    plr_anim={240,241,242,243} --indexes for plr sprite
+    x_direction={-1,1,0,0}
+    y_direction={0,0,-1,1}
+end
+
+function start_game()
+    plr_x=1
+    plr_y=3
+    plr_offset_x=0
+    plr_offset_y=0
+    plr_ini_offset_x=0 --initial offsets will keep animation from skipping for a frame
+    plr_ini_offset_y=0
+    plr_timer=0
 end
 
 -->8
 -- update --
 
-function _update()
+function _update60()
     frame_timer+=1
     _update_func()
 end
 
 function update_game()
-    if btnp(⬅️) then
-        plr_x-=1
-        plr_offset_x=8
-        _update_func=update_plr_turn
-    end
-    if btnp(➡️) then
-        plr_x+=1
-        plr_offset_x=-8
-        _update_func=update_plr_turn
-    end
-    if btnp(⬆️) then
-        plr_y-=1
-        plr_offset_y=8
-        _update_func=update_plr_turn
-    end
-    if btnp(⬇️) then
-        plr_y+=1
-        plr_offset_y=-8
-        _update_func=update_plr_turn
+    --this loop provides a much more efficient approach to handling btn inputs
+    --and calculating player direction/animation offsets using tables
+    for i=0,3 do
+        if btnp(i) then
+            local _dx,_dy=x_direction[i+1],y_direction[i+1]
+            plr_x+=_dx
+            plr_y+=_dy
+            plr_ini_offset_x,plr_ini_offset_y=_dx*-8,_dy*-8
+            plr_offset_x,plr_offset_y=plr_ini_offset_x,plr_ini_offset_y
+            plr_timer=0
+            _update_func=update_plr_turn
+        end
     end
 end
 
@@ -51,19 +56,14 @@ function update_game_over()
 end
 
 function update_plr_turn()
-    if plr_offset_x>0 then
-        plr_offset_x-=1
-    end
-    if plr_offset_x<0 then
-        plr_offset_x+=1
-    end
-    if plr_offset_y>0 then
-        plr_offset_y-=1
-    end
-    if plr_offset_y<0 then
-        plr_offset_y+=1
-    end
-    if plr_offset_x==0 and plr_offset_y==0 then
+    --increment plr timer and keep less than 1
+    plr_timer=min(plr_timer+0.125,1) --increments by adjustable value (affects movement speed)
+    --these offsets will slide the character forward in the draw_game() function
+    plr_offset_x=plr_ini_offset_x*(1-plr_timer)
+    plr_offset_y=plr_ini_offset_y*(1-plr_timer)
+
+    --player movement should be consistent, so update is prevented from running until animation is complete
+    if plr_timer==1 then
         _update_func=update_game
     end
 end
@@ -94,20 +94,10 @@ function draw_sprite(_spr,_x,_y,_col)
 end
 
 -->8
--- functions--
-
-function start_game()
-    plr_x=1
-    plr_y=3
-    plr_offset_x=0
-    plr_offset_y=0
-end
-
--->8
 -- tools --
 
 function get_frame(_anim_array)
-    return _anim_array[(flr(frame_timer/8)%#_anim_array)+1]
+    return _anim_array[(flr(frame_timer/15)%#_anim_array)+1]
 end
 
 __gfx__
