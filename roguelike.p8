@@ -6,8 +6,8 @@ __lua__
 -- init --
 
 function _init()
-    _update_func=update_game
-    _draw_func=draw_game
+    update_func=update_game
+    draw_func=draw_game
     start_game()
 
     -- globals --
@@ -25,6 +25,7 @@ function start_game()
     plr_ini_offset_x=0 --initial offsets will keep animation from skipping for a frame
     plr_ini_offset_y=0
     plr_flip=false
+    plr_anim_func=nil --function ptr for loading animations
     plr_timer=0
 end
 
@@ -33,7 +34,7 @@ end
 
 function _update60()
     frame_timer+=1
-    _update_func()
+    update_func()
 end
 
 function update_game()
@@ -41,19 +42,7 @@ function update_game()
     --and calculating player direction/animation offsets using tables
     for i=0,3 do
         if btnp(i) then
-            local _dx,_dy=x_direction[i+1],y_direction[i+1]
-            plr_x+=_dx
-            plr_y+=_dy
-            --handle character flipping
-            if _dx<0 then
-                plr_flip=true
-            elseif _dx>0 then
-                plr_flip=false
-            end
-            plr_ini_offset_x,plr_ini_offset_y=_dx*-8,_dy*-8
-            plr_offset_x,plr_offset_y=plr_ini_offset_x,plr_ini_offset_y
-            plr_timer=0
-            _update_func=update_plr_turn
+            move_player(x_direction[i+1],y_direction[i+1])
         end
     end
 end
@@ -65,13 +54,12 @@ end
 function update_plr_turn()
     --increment plr timer and keep less than 1
     plr_timer=min(plr_timer+0.125,1) --increments by adjustable value (affects movement speed)
-    --these offsets will slide the character forward in the draw_game() function
-    plr_offset_x=plr_ini_offset_x*(1-plr_timer)
-    plr_offset_y=plr_ini_offset_y*(1-plr_timer)
 
-    --player movement should be consistent, so update is prevented from running until animation is complete
+    plr_anim_func()
+
+    --check if animation if over
     if plr_timer==1 then
-        _update_func=update_game
+        update_func=update_game
     end
 end
 
@@ -79,7 +67,7 @@ end
 -- draw --
 
 function _draw()
-    _draw_func()
+    draw_func()
 end
 
 function draw_game()
@@ -109,6 +97,57 @@ end
 
 -->8
 -- gameplay --
+
+function move_player(_dx,_dy)
+    local _dest_x,_dest_y=plr_x+_dx,plr_y+_dy
+    local _dest_tile=mget(_dest_x,_dest_y)
+
+    --handle character flipping
+    if _dx<0 then
+        plr_flip=true
+    elseif _dx>0 then
+        plr_flip=false
+    end
+
+    if fget(_dest_tile,0) then --moving into a wall
+        --set offsets for animation
+        plr_ini_offset_x,plr_ini_offset_y=_dx*8,_dy*8
+        plr_offset_x,plr_offset_y=0,0
+        plr_timer=0
+
+        --load next update calls
+        update_func=update_plr_turn
+        plr_anim_func=bump_wall
+    else --player is allowed to move
+        plr_x+=_dx
+        plr_y+=_dy
+
+        --set offsets for animation
+        plr_ini_offset_x,plr_ini_offset_y=_dx*-8,_dy*-8
+        plr_offset_x,plr_offset_y=plr_ini_offset_x,plr_ini_offset_y
+        plr_timer=0
+
+        --load next update calls
+        update_func=update_plr_turn
+        plr_anim_func=walk
+    end
+end
+
+--update offsets for sliding player forward when they move
+function walk()
+    plr_offset_x=plr_ini_offset_x*(1-plr_timer)
+    plr_offset_y=plr_ini_offset_y*(1-plr_timer)
+end
+
+--update offsets for bouncing player off of a wall when colliding
+function bump_wall()
+    local _timer=plr_timer
+    if plr_timer>0.5 then
+        _timer=1-plr_timer
+    end
+    plr_offset_x=plr_ini_offset_x*_timer
+    plr_offset_y=plr_ini_offset_y*_timer
+end
 
 __gfx__
 0000000000000000606660600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a000000005555555
@@ -239,6 +278,9 @@ __gfx__
 66000000066066000600000066066600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 66066606066066000600660066066606000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00600600000660000600060000066000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+__gff__
+0000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __map__
 0000000202020202020202020202020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000000020101010101010101010e020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
