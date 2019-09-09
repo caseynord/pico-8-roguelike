@@ -103,11 +103,7 @@ function move_player(_dx,_dy)
     local _dest_tile=mget(_dest_x,_dest_y)
 
     --handle character flipping
-    if _dx<0 then
-        plr_flip=true
-    elseif _dx>0 then
-        plr_flip=false
-    end
+    plr_flip=_dy!=0 and plr_flip or _dx<0
 
     if fget(_dest_tile,0) then --moving into a wall
         --set offsets for animation
