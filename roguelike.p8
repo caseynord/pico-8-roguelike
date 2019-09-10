@@ -39,9 +39,7 @@ function _update60()
 end
 
 function update_game()
-    if input_buffer==-1 then
-        input_buffer=get_input_buffer()
-    end
+    buffer_input()
 
     handle_input(input_buffer)
     input_buffer=-1 --reset to -1 to prepare for next input
@@ -52,9 +50,7 @@ function update_game_over()
 end
 
 function update_plr_turn()
-    if input_buffer==-1 then
-        input_buffer=get_input_buffer()
-    end
+    buffer_input()
 
     --increment plr timer and keep less than 1
     plr_timer=min(plr_timer+0.125,1) --increments by adjustable value (affects movement speed)
@@ -99,7 +95,13 @@ function get_frame(_anim_array)
     return _anim_array[(flr(frame_timer/15)%#_anim_array)+1]
 end
 
-function get_input_buffer()
+function buffer_input()
+    if input_buffer==-1 then
+        input_buffer=check_input()
+    end
+end
+
+function check_input()
     --this loop provides a much more efficient approach to handling btn inputs
     --and calculating player direction/animation offsets using tables
     for i=0,5 do
@@ -112,7 +114,7 @@ end
 
 function handle_input(_input_buffer)
     if _input_buffer<0 then return end
-    if _input_buffer>=0 and _input_buffer<4 then
+    if _input_buffer<4 then
         move_player(x_direction[_input_buffer+1],y_direction[_input_buffer+1])
         return
     end
