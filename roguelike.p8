@@ -78,9 +78,7 @@ end
 
 function _draw()
     draw_func()
-
-    --called here so that it can be used anywhere in the game
-    draw_window()
+    draw_window() --called here so that it can be used anywhere in the game
 end
 
 function draw_game()
@@ -114,18 +112,6 @@ function buffer_input()
     end
 end
 
-function rectfill2(_x,_y,_w,_h,_col)
-    rectfill(_x,_y,_x+max(_w-1,0),_y+max(_h-1,0),_col)
-end
-
---print text with outline
-function oprint8(_text,_x,_y,_col,_col2)
-    for i=1,8 do
-        print(_text,_x+x_direction[i],_y+y_direction[i],_col2)
-    end
-    print(_text,_x,_y,_col)
-end
-
 function check_input()
     --this loop provides a much more efficient approach to handling btn inputs
     --and calculating player direction/animation offsets using tables
@@ -144,6 +130,18 @@ function handle_input(_input_buffer)
         return
     end
     --todo: menu button
+end
+
+function rectfill2(_x,_y,_w,_h,_col)
+    rectfill(_x,_y,_x+max(_w-1,0),_y+max(_h-1,0),_col)
+end
+
+--print text with outline
+function oprint8(_text,_x,_y,_col,_col2)
+    for i=1,8 do
+        print(_text,_x+x_direction[i],_y+y_direction[i],_col2)
+    end
+    print(_text,_x,_y,_col)
 end
 
 -->8
@@ -247,8 +245,8 @@ function draw_window()
         clip(_wx,_wy,_ww-8,_wh-8)
         for i=1,#w.text do
             local _text=w.text[i]
-                print(_text,_wx,_wy,6)
-                _wy+=6
+            print(_text,_wx,_wy,6)
+            _wy+=6
         end
         clip() --reset clipping so button will appear
 
