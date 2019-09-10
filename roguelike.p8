@@ -30,8 +30,6 @@ function start_game()
     plr_timer=0
 
     window={}
-
-    add_window(32,64,64,24,{"hello world!","how are you?"})
 end
 
 -->8
@@ -109,7 +107,7 @@ function buffer_input()
 end
 
 function rectfill2(_x,_y,_w,_h,_col)
-    rectfill(_x,_y,_x+_w-1,_y+_h-1,_col)
+    rectfill(_x,_y,_x+max(_w-1,0),_y+max(_h-1,0),_col)
 end
 
 function check_input()
@@ -185,6 +183,10 @@ function trigger_interaction(_tile,_dest_x,_dest_y)
     --door
     sfx(62)
     mset(_dest_x,_dest_y,1) --replace door with empty tile
+    elseif _tile==6 then
+    --stone tablet
+    --add_window(32,53,53,24,{"welcome to the","world of porklike"})
+    show_message("hello world!",120)
     end
 end
 
@@ -229,7 +231,25 @@ function draw_window()
                 print(_text,_wx,_wy,6)
                 _wy+=6
         end
+
+        if w.duration!=nil then
+            w.duration-=1
+            if w.duration<=0 then
+                local dif=w.h/4
+                w.y+=dif/2
+                w.h-=dif
+                if w.h<3 then
+                    del(window,w)
+                end
+            end
+        end
     end
+end
+
+function show_message(_text,_duration)
+    local _width=#_text*4+7
+    local _window=add_window(63-_width/2,50,_width,13,{_text})
+    _window.duration=_duration
 end
 
 __gfx__
