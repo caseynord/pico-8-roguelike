@@ -13,8 +13,8 @@ function _init()
     -- globals --
     frame_timer=0
     plr_anim={240,241,242,243} --indexes for plr sprite
-    x_direction={-1,1,0,0}
-    y_direction={0,0,-1,1}
+    x_direction={-1,1,0,0,1,1,-1,-1} --last 4 values are for diagonals
+    y_direction={0,0,-1,1,-1,1,1,-1} --last 4 values are for diagonals
 end
 
 function start_game()
@@ -30,6 +30,7 @@ function start_game()
     plr_timer=0
 
     window={}
+    text_window=nil --this window is used for text that is dismissed with a button press
 end
 
 -->8
@@ -41,10 +42,17 @@ function _update60()
 end
 
 function update_game()
-    buffer_input()
-
-    handle_input(input_buffer)
-    input_buffer=-1 --reset to -1 to prepare for next input
+    --check for onscreen text
+    if text_window!=nil then
+        if check_input()==5 then --close window
+            text_window.duration=0
+            text_window=nil
+        end
+    else --else so player can't move while window is open
+        buffer_input()
+        handle_input(input_buffer)
+        input_buffer=-1 --reset to -1 to prepare for next input
+    end
 end
 
 function update_game_over()
@@ -110,6 +118,14 @@ function rectfill2(_x,_y,_w,_h,_col)
     rectfill(_x,_y,_x+max(_w-1,0),_y+max(_h-1,0),_col)
 end
 
+--print text with outline
+function oprint8(_text,_x,_y,_col,_col2)
+    for i=1,8 do
+        print(_text,_x+x_direction[i],_y+y_direction[i],_col2)
+    end
+    print(_text,_x,_y,_col)
+end
+
 function check_input()
     --this loop provides a much more efficient approach to handling btn inputs
     --and calculating player direction/animation offsets using tables
@@ -172,21 +188,24 @@ end
 
 function trigger_interaction(_tile,_dest_x,_dest_y)
     if _tile==7 or _tile==8 then
-    --vase
-    sfx(59)
-    mset(_dest_x,_dest_y,1) --destroy vase and replace with floor tile
+        --vase
+        sfx(59)
+        mset(_dest_x,_dest_y,1) --destroy vase and replace with floor tile
     elseif _tile==10 or _tile==12 then
-    --chest
-    sfx(61)
-    mset(_dest_x,_dest_y,_tile-1) --replace closed chest with open chest
+        --chest
+        sfx(61)
+        mset(_dest_x,_dest_y,_tile-1) --replace closed chest with open chest
     elseif _tile==13 then
-    --door
-    sfx(62)
-    mset(_dest_x,_dest_y,1) --replace door with empty tile
+        --door
+        sfx(62)
+        mset(_dest_x,_dest_y,1) --replace door with empty tile
     elseif _tile==6 then
-    --stone tablet
-    --add_window(32,53,53,24,{"welcome to the","world of porklike"})
-    show_message("hello world!",120)
+        --stone tablet
+        if _dest_x==2 and _dest_y==4 then
+            show_message({"welcome to porklike","","climb the tower","to obtain the","golden kielbasa"})
+        elseif _dest_x==5 and _dest_y==14 then
+            show_message({"here is another","test message"})     
+        end
     end
 end
 
@@ -231,10 +250,13 @@ function draw_window()
                 print(_text,_wx,_wy,6)
                 _wy+=6
         end
+        clip() --reset clipping so button will appear
 
+        --close window animation
         if w.duration!=nil then
             w.duration-=1
             if w.duration<=0 then
+                --collapse window into itself
                 local dif=w.h/4
                 w.y+=dif/2
                 w.h-=dif
@@ -242,14 +264,23 @@ function draw_window()
                     del(window,w)
                 end
             end
+        else
+            if text_window.button then
+                oprint8("❎",_wx+_ww-15,_wy-1+sin(time()),6,0)
+            end
         end
     end
 end
 
 function show_message(_text,_duration)
-    local _width=#_text*4+7
-    local _window=add_window(63-_width/2,50,_width,13,{_text})
+    local _width=(#_text+2)*4+7  --plus 2 after _text adds spacing after text for readability
+    local _window=add_window(63-_width/2,50,_width,13,{" ".._text}) --concat to add spacing before text
     _window.duration=_duration
+end
+
+function show_message(_text)
+    text_window=add_window(16,50,94,#_text*6+7,_text)
+    text_window.button=true
 end
 
 __gfx__
