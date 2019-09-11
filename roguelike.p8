@@ -2,7 +2,6 @@ pico-8 cartridge // http://www.pico-8.com
 version 18
 __lua__
 
--->8
 -- init --
 
 function _init()
@@ -18,6 +17,8 @@ function _init()
 end
 
 function start_game()
+    button_timer=0
+    --frame_timer
     input_buffer=-1
 
     mob={}
@@ -31,7 +32,7 @@ function start_game()
     plr_ini_offset_y=0
     plr_flip=false
     plr_anim_func=nil --function ptr for loading animations
-    plr_timer=0
+    plr_timer=0 --todo: maybe go away?
 
     window={}
     text_window=nil --this window is used for text that is dismissed with a button press
@@ -41,6 +42,12 @@ end
 -- update --
 
 function _update60()
+    --constrain button oscillation so it doesn't skip
+    if button_timer<=0.95 then
+        button_timer+=0.01
+    else
+        button_timer=0
+    end
     frame_timer+=1
     update_func()
 end
@@ -273,7 +280,7 @@ function draw_window()
             end
         else
             if text_window.button then
-                oprint8("❎",_wx+_ww-15,_wy-1+sin(time()),6,0)
+                oprint8("❎",_wx+_ww-15,_wy-1+sin(button_timer*2),6,0)
             end
         end
     end
