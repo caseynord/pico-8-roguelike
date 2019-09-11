@@ -297,6 +297,11 @@ function add_mob(_type,_mx,_my)
     local _mob={
         x=_mx,
         y=_my,
+        offset_x=0,
+        offset_y=0,
+        ini_offset_x=0, --initial offsets will keep animation from skipping for a frame
+        ini_offset_y=0,
+        flip=false,
         anim={192,193,194,195}
     }
     add(mob,_mob)    
