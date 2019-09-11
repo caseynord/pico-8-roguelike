@@ -43,7 +43,7 @@ end
 
 function update_game()
     --check for onscreen text
-    if text_window!=nil then
+    if text_window then
         if check_input()==5 then --close window
             text_window.duration=0
             text_window=nil
@@ -127,7 +127,6 @@ function handle_input(_input_buffer)
     if _input_buffer<0 then return end
     if _input_buffer<4 then
         move_player(x_direction[_input_buffer+1],y_direction[_input_buffer+1])
-        return
     end
     --todo: menu button
 end
@@ -215,6 +214,7 @@ end
 
 --update offsets for bouncing player off of a wall when colliding
 function bump_wall()
+    --★
     local _timer=plr_timer
     if plr_timer>0.5 then
         _timer=1-plr_timer
@@ -238,8 +238,7 @@ function draw_window()
     for w in all(window) do
         local _wx,_wy,_ww,_wh=w.x,w.y,w.w,w.h
         rectfill2(_wx,_wy,_ww,_wh,0)
-        rectfill2(_wx+1,_wy+1,_ww-2,_wh-2,6)
-        rectfill2(_wx+2,_wy+2,_ww-4,_wh-4,0)
+        rect(_wx+1,_wy+1,_wx+_ww-2,_wy+_wh-2,6)
         _wx+=4
         _wy+=4
         clip(_wx,_wy,_ww-8,_wh-8)
