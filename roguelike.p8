@@ -5,34 +5,28 @@ __lua__
 -- init --
 
 function _init()
+    -- timers --
+    button_timer=0
+    frame_timer=0
+    plr_timer=0
+
+    plr_anim={240,241,242,243} --indexes for plr sprite
+    mob_anim={240,192}
+    
+    x_direction={-1,1,0,0,1,1,-1,-1} --last 4 values are for diagonals
+    y_direction={0,0,-1,1,-1,1,1,-1} --last 4 values are for diagonals
+    
     update_func=update_game
     draw_func=draw_game
     start_game()
-
-    -- globals --
-    frame_timer=0
-    plr_anim={240,241,242,243} --indexes for plr sprite
-    x_direction={-1,1,0,0,1,1,-1,-1} --last 4 values are for diagonals
-    y_direction={0,0,-1,1,-1,1,1,-1} --last 4 values are for diagonals
 end
 
 function start_game()
-    button_timer=0
-    --frame_timer
     input_buffer=-1
 
     mob={}
-    add_mob(0,2,11)
-
-    plr_x=1
-    plr_y=1
-    plr_offset_x=0
-    plr_offset_y=0
-    plr_ini_offset_x=0 --initial offsets will keep animation from skipping for a frame
-    plr_ini_offset_y=0
-    plr_flip=false
-    plr_anim_func=nil --function ptr for loading animations
-    plr_timer=0 --todo: maybe go away?
+    plr=add_mob(1,1,1) --player
+    add_mob(2,2,11)
 
     window={}
     text_window=nil --this window is used for text that is dismissed with a button press
@@ -76,7 +70,7 @@ function update_plr_turn()
     --increment plr timer and keep less than 1
     plr_timer=min(plr_timer+0.125,1) --increments by adjustable value (affects movement speed)
 
-    plr_anim_func()
+    plr.anim_func(plr,plr_timer)
 
     --check if animation if over
     if plr_timer==1 then
@@ -97,11 +91,11 @@ function draw_game()
     map()
 
     --draw player
-    draw_sprite(get_frame(plr_anim),plr_x*8+plr_offset_x,plr_y*8+plr_offset_y,10,plr_flip)
+    -- draw_sprite(get_frame(plr_anim),plr_x*8+plr_offset_x,plr_y*8+plr_offset_y,10,plr_flip)
 
     --draw monsters
     for m in all(mob) do
-        draw_sprite(get_frame(m.anim),m.x*8,m.y*8,10,false)
+        draw_sprite(get_frame(m.anim),m.x*8+m.offset_x,m.y*8+m.offset_y,10,m.flp)
     end
 end
 
@@ -164,39 +158,44 @@ end
 -- gameplay --
 
 function move_player(_dx,_dy)
-    local _dest_x,_dest_y=plr_x+_dx,plr_y+_dy
+    local _dest_x,_dest_y=plr.x+_dx,plr.y+_dy
     local _dest_tile=mget(_dest_x,_dest_y)
 
     --handle character flipping
-    plr_flip=_dy!=0 and plr_flip or _dx<0
+    plr.flp=_dy!=0 and plr.flp or _dx<0
 
-    if fget(_dest_tile,0) then --moving into a wall
-        --set offsets for animation
-        plr_ini_offset_x,plr_ini_offset_y=_dx*8,_dy*8
-        plr_offset_x,plr_offset_y=0,0
-        plr_timer=0
-
-        --load next update calls
-        update_func=update_plr_turn
-        plr_anim_func=bump_wall
-
-        if fget(_dest_tile,1) then
-            trigger_interaction(_dest_tile,_dest_x,_dest_y)
-        end
-    else --player is allowed to move
+    if is_walkable(_dest_x,_dest_y,"checkmobs") then --player is allowed to move
         sfx(63)
-        plr_x+=_dx
-        plr_y+=_dy
+        plr.x+=_dx
+        plr.y+=_dy
 
         --set offsets for animation
-        plr_ini_offset_x,plr_ini_offset_y=_dx*-8,_dy*-8
-        plr_offset_x,plr_offset_y=plr_ini_offset_x,plr_ini_offset_y
+        plr.ini_offset_x,plr.ini_offset_y=_dx*-8,_dy*-8
+        plr.offset_x,plr.offset_y=plr.ini_offset_x,plr.ini_offset_y
         plr_timer=0
 
         --load next update calls
         update_func=update_plr_turn
-        plr_anim_func=walk
-        
+        plr.anim_func=walk
+    else --not walkable
+        --set offsets for animation
+        plr.ini_offset_x,plr.ini_offset_y=_dx*8,_dy*8
+        plr.offset_x,plr.offset_y=0,0
+        plr_timer=0
+
+        --load next update calls
+        update_func=update_plr_turn
+        plr.anim_func=bump_wall
+
+        local _mob=get_mob(_dest_x,_dest_y)
+        if _mob==false then --there is no mob...
+            --player must be colliding with something else
+            if fget(_dest_tile,1) then
+                trigger_interaction(_dest_tile,_dest_x,_dest_y)
+            end
+        else --there is a mob so deal with it
+            hit_mob(plr,_mob)
+        end
     end
 end
 
@@ -224,20 +223,51 @@ function trigger_interaction(_tile,_dest_x,_dest_y)
 end
 
 --update offsets for sliding player forward when they move
-function walk()
-    plr_offset_x=plr_ini_offset_x*(1-plr_timer)
-    plr_offset_y=plr_ini_offset_y*(1-plr_timer)
+function walk(_mob,_anim_timer)
+    _mob.offset_x=_mob.ini_offset_x*(1-_anim_timer)
+    _mob.offset_y=_mob.ini_offset_y*(1-_anim_timer)
 end
 
 --update offsets for bouncing player off of a wall when colliding
-function bump_wall()
+function bump_wall(_mob,_anim_timer)
     --★
-    local _timer=plr_timer
-    if plr_timer>0.5 then
-        _timer=1-plr_timer
+    local _timer=_anim_timer
+    if _anim_timer>0.5 then
+        _timer=1-_anim_timer
     end
-    plr_offset_x=plr_ini_offset_x*_timer
-    plr_offset_y=plr_ini_offset_y*_timer
+    _mob.offset_x=_mob.ini_offset_x*_timer
+    _mob.offset_y=_mob.ini_offset_y*_timer
+end
+
+function get_mob(_x,_y)
+    for m in all(mob) do
+        if m.x==_x and m.y==_y then
+            return m
+        end
+    end
+    return false
+end
+
+function is_walkable(_x,_y,_mode)
+    if _mode==nil then _mode="" end
+    if in_bounds(_x,_y) then
+        local _dest_tile=mget(_x,_y)
+        if fget(_dest_tile,0)==false then
+            if _mode=="checkmobs" then
+                return get_mob(_x,_y)==false
+            end
+            return true
+        end
+    end
+    return false
+end
+
+function in_bounds(_x,_y)
+    return not (_x<0 or _y<0 or _x>15 or _y>15)
+end
+
+function hit_mob(_attacker,_defender)
+    --attack
 end
 
 -->8
@@ -304,9 +334,20 @@ function add_mob(_type,_mx,_my)
     local _mob={
         x=_mx,
         y=_my,
-        anim={192,193,194,195}
+        offset_x=0,
+        offset_y=0,
+        ini_offset_x=0, --initial offsets will keep animation from skipping for a frame
+        ini_offset_y=0,
+        flp=false,
+        anim_func=nil, --function ptr for loading animations
+        anim={}
     }
-    add(mob,_mob)    
+    for i=0,3 do
+        add(_mob.anim,mob_anim[_type]+i)
+    end
+    add(mob,_mob)
+
+    return _mob
 end
 
 __gfx__
