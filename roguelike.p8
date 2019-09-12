@@ -158,20 +158,7 @@ function move_player(_dx,_dy)
     --handle character flipping
     plr.flp=_dy!=0 and plr.flp or _dx<0
 
-    if fget(_dest_tile,0) then --moving into a wall
-        --set offsets for animation
-        plr.ini_offset_x,plr.ini_offset_y=_dx*8,_dy*8
-        plr.offset_x,plr.offset_y=0,0
-        plr_timer=0
-
-        --load next update calls
-        update_func=update_plr_turn
-        plr.anim_func=bump_wall
-
-        if fget(_dest_tile,1) then
-            trigger_interaction(_dest_tile,_dest_x,_dest_y)
-        end
-    else --player is allowed to move
+    if is_walkable(_dest_x,_dest_y,"checkmobs") then --player is allowed to move
         sfx(63)
         plr.x+=_dx
         plr.y+=_dy
@@ -184,7 +171,25 @@ function move_player(_dx,_dy)
         --load next update calls
         update_func=update_plr_turn
         plr.anim_func=walk
-        
+    else --not walkable
+        --set offsets for animation
+        plr.ini_offset_x,plr.ini_offset_y=_dx*8,_dy*8
+        plr.offset_x,plr.offset_y=0,0
+        plr_timer=0
+
+        --load next update calls
+        update_func=update_plr_turn
+        plr.anim_func=bump_wall
+
+        local _mob=get_mob(_dest_x,_dest_y)
+        if _mob==false then --there is no mob...
+            --player must be colliding with something else
+            if fget(_dest_tile,1) then
+                trigger_interaction(_dest_tile,_dest_x,_dest_y)
+            end
+        else --there is a mob so deal with it
+            hit_mob(plr,_mob)
+        end
     end
 end
 
@@ -226,6 +231,37 @@ function bump_wall(_mob,_anim_timer)
     end
     _mob.offset_x=_mob.ini_offset_x*_timer
     _mob.offset_y=_mob.ini_offset_y*_timer
+end
+
+function get_mob(_x,_y)
+    for m in all(mob) do
+        if m.x==_x and m.y==_y then
+            return m
+        end
+    end
+    return false
+end
+
+function is_walkable(_x,_y,_mode)
+    if _mode==nil then _mode="" end
+    if in_bounds(_x,_y) then
+        local _dest_tile=mget(_x,_y)
+        if fget(_dest_tile,0)==false then
+            if _mode=="checkmobs" then
+                return get_mob(_x,_y)==false
+            end
+            return true
+        end
+    end
+    return false
+end
+
+function in_bounds(_x,_y)
+    return not (_x<0 or _y<0 or _x>15 or _y>15)
+end
+
+function hit_mob(_attacker,_defender)
+    --attack
 end
 
 -->8
