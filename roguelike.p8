@@ -10,8 +10,10 @@ function _init()
     frame_timer=0
     plr_timer=0
 
-    plr_anim={240,241,242,243} --indexes for plr sprite
+    plr_anim={240,241,242,243} --indexes for plr sprite --todo: delete
     mob_anim={240,192}
+    mob_atk={1,1}
+    mob_hp={5,2}
     
     x_direction={-1,1,0,0,1,1,-1,-1} --last 4 values are for diagonals
     y_direction={0,0,-1,1,-1,1,1,-1} --last 4 values are for diagonals
@@ -27,8 +29,11 @@ function start_game()
     mob={}
     plr=add_mob(1,1,1) --player
     add_mob(2,2,11)
+    add_mob(2,1,7)
+    add_mob(2,3,7)
 
     window={}
+    float={}
     text_window=nil --this window is used for text that is dismissed with a button press
 end
 
@@ -44,6 +49,7 @@ function _update60()
     end
     frame_timer+=1
     update_func()
+    update_float_nums() --called here so that it is always updating
 end
 
 function update_game()
@@ -95,7 +101,16 @@ function draw_game()
 
     --draw monsters
     for m in all(mob) do
-        draw_sprite(get_frame(m.anim),m.x*8+m.offset_x,m.y*8+m.offset_y,10,m.flp)
+        local _col=10
+        if m.flash>0 then
+            m.flash-=1
+            _col=7
+        end
+        draw_sprite(get_frame(m.anim),m.x*8+m.offset_x,m.y*8+m.offset_y,_col,m.flp)
+    end
+
+    for f in all(float) do
+        oprint8(f.text,f.x,f.y,f.col,0)
     end
 end
 
@@ -161,31 +176,16 @@ function move_player(_dx,_dy)
     local _dest_x,_dest_y=plr.x+_dx,plr.y+_dy
     local _dest_tile=mget(_dest_x,_dest_y)
 
-    --handle character flipping
-    plr.flp=_dy!=0 and plr.flp or _dx<0
-
     if is_walkable(_dest_x,_dest_y,"checkmobs") then --player is allowed to move
         sfx(63)
-        plr.x+=_dx
-        plr.y+=_dy
-
-        --set offsets for animation
-        plr.ini_offset_x,plr.ini_offset_y=_dx*-8,_dy*-8
-        plr.offset_x,plr.offset_y=plr.ini_offset_x,plr.ini_offset_y
+        mob_walk(plr,_dx,_dy)
         plr_timer=0
-
-        --load next update calls
         update_func=update_plr_turn
-        plr.anim_func=walk
     else --not walkable
         --set offsets for animation
-        plr.ini_offset_x,plr.ini_offset_y=_dx*8,_dy*8
-        plr.offset_x,plr.offset_y=0,0
+        mob_bump(plr,_dx,_dy)
         plr_timer=0
-
-        --load next update calls
         update_func=update_plr_turn
-        plr.anim_func=bump_wall
 
         local _mob=get_mob(_dest_x,_dest_y)
         if _mob==false then --there is no mob...
@@ -194,6 +194,7 @@ function move_player(_dx,_dy)
                 trigger_interaction(_dest_tile,_dest_x,_dest_y)
             end
         else --there is a mob so deal with it
+            sfx(58)
             hit_mob(plr,_mob)
         end
     end
@@ -222,32 +223,6 @@ function trigger_interaction(_tile,_dest_x,_dest_y)
     end
 end
 
---update offsets for sliding player forward when they move
-function walk(_mob,_anim_timer)
-    _mob.offset_x=_mob.ini_offset_x*(1-_anim_timer)
-    _mob.offset_y=_mob.ini_offset_y*(1-_anim_timer)
-end
-
---update offsets for bouncing player off of a wall when colliding
-function bump_wall(_mob,_anim_timer)
-    --★
-    local _timer=_anim_timer
-    if _anim_timer>0.5 then
-        _timer=1-_anim_timer
-    end
-    _mob.offset_x=_mob.ini_offset_x*_timer
-    _mob.offset_y=_mob.ini_offset_y*_timer
-end
-
-function get_mob(_x,_y)
-    for m in all(mob) do
-        if m.x==_x and m.y==_y then
-            return m
-        end
-    end
-    return false
-end
-
 function is_walkable(_x,_y,_mode)
     if _mode==nil then _mode="" end
     if in_bounds(_x,_y) then
@@ -264,10 +239,6 @@ end
 
 function in_bounds(_x,_y)
     return not (_x<0 or _y<0 or _x>15 or _y>15)
-end
-
-function hit_mob(_attacker,_defender)
-    --attack
 end
 
 -->8
@@ -327,6 +298,20 @@ function show_message(_text)
     text_window.button=true
 end
 
+function add_float_num(_text,_x,_y,_col)
+    add(float,{text=_text,x=_x,y=_y,target_y=_y-10,col=_col,timer=0})
+end
+
+function update_float_nums()
+    for f in all(float) do
+        f.y+=(f.target_y-f.y)/10
+        f.timer+=1
+        if f.timer>70 then
+            del(float,f)
+        end
+    end
+end
+
 -->8
 -- mobs --
 
@@ -338,6 +323,10 @@ function add_mob(_type,_mx,_my)
         offset_y=0,
         ini_offset_x=0, --initial offsets will keep animation from skipping for a frame
         ini_offset_y=0,
+        hp=mob_hp[_type],
+        hp_max=mob_hp[_type],
+        atk=mob_atk[_type],
+        flash=0,
         flp=false,
         anim_func=nil, --function ptr for loading animations
         anim={}
@@ -348,6 +337,72 @@ function add_mob(_type,_mx,_my)
     add(mob,_mob)
 
     return _mob
+end
+
+function get_mob(_x,_y)
+    for m in all(mob) do
+        if m.x==_x and m.y==_y then
+            return m
+        end
+    end
+    return false
+end
+
+function hit_mob(_attacker,_defender)
+    local dmg=_attacker.atk
+    _defender.hp-=_attacker.atk
+    _defender.flash=10
+
+    add_float_num("-"..dmg,_defender.x*8,_defender.y*8,9)
+
+    if _defender.hp<=0 then
+        --todo: deal with player too
+        del(mob,_defender)
+    end
+end
+
+function mob_flip(_mob,_dx,_dy)
+    _mob.flp=_dy!=0 and _mob.flp or _dx<0
+end
+
+function mob_walk(_mob,_dx,_dy)
+    _mob.x+=_dx
+    _mob.y+=_dy
+
+    mob_flip(_mob,_dx,_dy)
+
+    --set offsets for animation
+    _mob.ini_offset_x,_mob.ini_offset_y=_dx*-8,_dy*-8
+    _mob.offset_x,_mob.offset_y=_mob.ini_offset_x,_mob.ini_offset_y
+
+    --load next animation function
+    _mob.anim_func=walk
+end
+
+function mob_bump(_mob,_dx,_dy)
+    mob_flip(_mob,_dx,_dy)
+    _mob.ini_offset_x,_mob.ini_offset_y=_dx*8,_dy*8
+    _mob.offset_x,_mob.offset_y=0,0
+
+    --load next animation function
+    _mob.anim_func=bump_wall
+end
+
+--update offsets for sliding player forward when they move
+function walk(_mob,_anim_timer)
+    _mob.offset_x=_mob.ini_offset_x*(1-_anim_timer)
+    _mob.offset_y=_mob.ini_offset_y*(1-_anim_timer)
+end
+
+--update offsets for bouncing player off of a wall when colliding
+function bump_wall(_mob,_anim_timer)
+    --★
+    local _timer=_anim_timer
+    if _anim_timer>0.5 then
+        _timer=1-_anim_timer
+    end
+    _mob.offset_x=_mob.ini_offset_x*_timer
+    _mob.offset_y=_mob.ini_offset_y*_timer
 end
 
 __gfx__
@@ -494,7 +549,7 @@ __map__
 0201010102010101010102010101020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 02020d02020201010102020d0202020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 020101010202020d020202010202020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0201c301020a0101010102010202020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+02010101020a0101010102010202020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0201010102010101010102010101020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 02010c0102020202020d02020201020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0201010102060101010101010101020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -557,8 +612,8 @@ __sfx__
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00010000211102114015140271300f6300f6101c610196001761016600156100f6000c61009600076000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000100001b61006540065401963018630116100e6100c610096100861000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000100001f5302b5302e5302e5303250032500395002751027510285102a510005000050000500275102951029510005000050000500005002451024510245102751029510005000050000500005000050000500
 0001000024030240301c0301c0302a2302823025210212101e2101b2101b21016210112100d2100a2100a2100a2100a2100a2100a2100a2100a2100a2100a2100a2100a2100a2100a2100a2100a2100020000200
 0001000024030240301c0301c03039010390103a0103001030010300102d010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
