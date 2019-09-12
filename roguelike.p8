@@ -33,6 +33,7 @@ function start_game()
     add_mob(2,3,7)
 
     window={}
+    float={}
     text_window=nil --this window is used for text that is dismissed with a button press
 end
 
@@ -48,6 +49,7 @@ function _update60()
     end
     frame_timer+=1
     update_func()
+    update_float_nums() --called here so that it is always updating
 end
 
 function update_game()
@@ -105,6 +107,10 @@ function draw_game()
             _col=7
         end
         draw_sprite(get_frame(m.anim),m.x*8+m.offset_x,m.y*8+m.offset_y,_col,m.flp)
+    end
+
+    for f in all(float) do
+        oprint8(f.text,f.x,f.y,f.col,0)
     end
 end
 
@@ -292,6 +298,20 @@ function show_message(_text)
     text_window.button=true
 end
 
+function add_float_num(_text,_x,_y,_col)
+    add(float,{text=_text,x=_x,y=_y,target_y=_y-10,col=_col,timer=0})
+end
+
+function update_float_nums()
+    for f in all(float) do
+        f.y+=(f.target_y-f.y)/10
+        f.timer+=1
+        if f.timer>70 then
+            del(float,f)
+        end
+    end
+end
+
 -->8
 -- mobs --
 
@@ -329,8 +349,12 @@ function get_mob(_x,_y)
 end
 
 function hit_mob(_attacker,_defender)
+    local dmg=_attacker.atk
     _defender.hp-=_attacker.atk
     _defender.flash=10
+
+    add_float_num("-"..dmg,_defender.x*8,_defender.y*8,9)
+
     if _defender.hp<=0 then
         --todo: deal with player too
         del(mob,_defender)
