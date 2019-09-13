@@ -20,6 +20,7 @@ function _init()
     
     update_func=update_game
     draw_func=draw_game
+    debug={}
     start_game()
 end
 
@@ -94,12 +95,18 @@ end
 function update_ai_turn()
     buffer_input()
 
+    debug={}
     --increment plr timer and keep less than 1
     plr_timer=min(plr_timer+0.125,1) --increments by adjustable value (affects movement speed)
 
     for m in all(mob) do
-        if m!=plr and m.walk then
-            m.walk(m,plr_timer)
+        if m!=plr then
+            --todo: fix this!
+            if m.anim_func then
+                m.anim_func(m,plr_timer)
+            else
+                add(debug,"empty walk func")
+            end
         end
     end
 
@@ -115,6 +122,14 @@ end
 function _draw()
     draw_func()
     draw_window() --called here so that it can be used anywhere in the game
+
+    --debugging
+    cursor(4,4)
+    color(8)
+    for text in all(debug) do
+        print(text)
+    end
+    color()
 end
 
 function draw_game()
@@ -439,16 +454,29 @@ end
 function mob_ai()
     for m in all(mob) do
         if m!=plr then
-            local _best_dest,_bx,_by=999,0,0
-            for i=1,4 do
-                local _dx,_dy=x_direction[i],y_direction[i]
-                local _distance=distance(m.x+_dx,m.y+_dy,plr.x,plr.y)
-                if _distance<_best_dest then
-                    _best_dest,_bx,_by=_distance,_dx,_dy
+            m.anim_func=nil
+            if distance(m.x,m.y,plr.x,plr.y)==1 then
+                --attack player
+                _dx,_dy=plr.x-m.x,plr.y-m.y
+                mob_bump(m,_dx,_dy)
+                hit_mob(m,plr)
+                sfx(57)
+            else
+                --move towards player
+                local _best_dest,_bx,_by=999,0,0
+                for i=1,4 do
+                    local _dx,_dy=x_direction[i],y_direction[i]
+                    local _target_x,_target_y=m.x+_dx,m.y+_dy
+                    if is_walkable(_target_x,_target_y,"checkmobs") then
+                        local _distance=distance(_target_x,_target_y,plr.x,plr.y)
+                        if _distance<_best_dest then
+                            _best_dest,_bx,_by=_distance,_dx,_dy
+                        end
+                    end
                 end
+                mob_walk(m,_bx,_by)
+                update_func=update_ai_turn
             end
-            mob_walk(m,_bx,_by)
-            update_func=update_ai_turn
         end
     end
 end
