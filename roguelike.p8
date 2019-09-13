@@ -87,6 +87,25 @@ function update_plr_turn()
     --check if animation if over
     if plr_timer==1 then
         update_func=update_game
+        mob_ai()
+    end
+end
+
+function update_ai_turn()
+    buffer_input()
+
+    --increment plr timer and keep less than 1
+    plr_timer=min(plr_timer+0.125,1) --increments by adjustable value (affects movement speed)
+
+    for m in all(mob) do
+        if m!=plr and m.walk then
+            m.walk(m,plr_timer)
+        end
+    end
+
+    --check if animation if over
+    if plr_timer==1 then
+        update_func=update_game --this stays in case there is no ai and control is returned to update
     end
 end
 
@@ -173,6 +192,12 @@ function oprint8(_text,_x,_y,_col,_col2)
         print(_text,_x+x_direction[i],_y+y_direction[i],_col2)
     end
     print(_text,_x,_y,_col)
+end
+
+--calculates hypotenuse of two lines
+function distance(_from_x,_from_y,_to_x,_to_y)
+    local _dx,_dy=_from_x-_to_x,_from_y-_to_y
+    return sqrt(_dx*_dx+_dy*_dy)
 end
 
 -->8
@@ -409,6 +434,23 @@ function bump_wall(_mob,_anim_timer)
     end
     _mob.offset_x=_mob.ini_offset_x*_timer
     _mob.offset_y=_mob.ini_offset_y*_timer
+end
+
+function mob_ai()
+    for m in all(mob) do
+        if m!=plr then
+            local _best_dest,_bx,_by=999,0,0
+            for i=1,4 do
+                local _dx,_dy=x_direction[i],y_direction[i]
+                local _distance=distance(m.x+_dx,m.y+_dy,plr.x,plr.y)
+                if _distance<_best_dest then
+                    _best_dest,_bx,_by=_distance,_dx,_dy
+                end
+            end
+            mob_walk(m,_bx,_by)
+            update_func=update_ai_turn
+        end
+    end
 end
 
 __gfx__
