@@ -93,20 +93,14 @@ function update_plr_turn()
 end
 
 function update_ai_turn()
-    buffer_input()
+    --buffer_input()  --todo: not necessary?
 
-    debug={}
     --increment plr timer and keep less than 1
     plr_timer=min(plr_timer+0.125,1) --increments by adjustable value (affects movement speed)
 
     for m in all(mob) do
-        if m!=plr then
-            --todo: fix this!
-            if m.anim_func then
-                m.anim_func(m,plr_timer)
-            else
-                add(debug,"empty walk func")
-            end
+        if m!=plr and m.anim_func then
+            m.anim_func(m,plr_timer)
         end
     end
 
@@ -129,7 +123,6 @@ function _draw()
     for text in all(debug) do
         print(text)
     end
-    color()
 end
 
 function draw_game()
@@ -457,7 +450,7 @@ function mob_ai()
             m.anim_func=nil
             if distance(m.x,m.y,plr.x,plr.y)==1 then
                 --attack player
-                _dx,_dy=plr.x-m.x,plr.y-m.y
+                local _dx,_dy=plr.x-m.x,plr.y-m.y
                 mob_bump(m,_dx,_dy)
                 hit_mob(m,plr)
                 sfx(57)
@@ -476,6 +469,7 @@ function mob_ai()
                 end
                 mob_walk(m,_bx,_by)
                 update_func=update_ai_turn
+                plr_timer=0
             end
         end
     end
