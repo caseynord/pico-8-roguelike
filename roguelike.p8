@@ -9,6 +9,8 @@ function _init()
     button_timer=0
     frame_timer=0
     plr_timer=0
+    
+    depalette={0,1,1,2,1,13,6,4,4,9,3,13,1,13,14}
 
     plr_anim={240,241,242,243} --indexes for plr sprite --todo: delete
     mob_anim={240,192}
@@ -17,12 +19,13 @@ function _init()
     
     x_direction={-1,1,0,0,1,1,-1,-1} --last 4 values are for diagonals
     y_direction={0,0,-1,1,-1,1,1,-1} --last 4 values are for diagonals
-    
+
     debug={}
     start_game()
 end
 
 function start_game()
+    fade_perc=1
     input_buffer=-1
 
     mob={}
@@ -76,6 +79,7 @@ end
 
 function update_game_over()
     if btnp(5) then
+        fade_out()
         start_game()
     end
 end
@@ -122,6 +126,7 @@ end
 function _draw()
     draw_func()
     draw_window() --called here so that it can be used anywhere in the game
+    check_fade()
 
     --debugging
     cursor(4,4)
@@ -234,6 +239,43 @@ end
 function distance(_from_x,_from_y,_to_x,_to_y)
     local _dx,_dy=_from_x-_to_x,_from_y-_to_y
     return sqrt(_dx*_dx+_dy*_dy)
+end
+
+function fade_screen()
+    local _p,_kmax,_col,_k=flr(mid(0,fade_perc,1)*100)
+    for j=1,15 do
+        _col=j
+        _kmax=flr((_p+(j*1.46))/22)
+        for k=1,_kmax do
+            _col=depalette[_col]
+        end
+        pal(j,_col,1)
+    end
+end
+
+function check_fade()
+    if fade_perc>0 then
+        fade_perc=max(fade_perc-0.04,0)
+        fade_screen()
+    end
+end
+
+function wait(_wait)
+    repeat
+        _wait-=1
+        flip()
+    until _wait<0
+end
+
+function fade_out(_spd,_wait)
+    if (_spd==nil) _spd=0.04
+    if (_wait==nil) _wait=0
+    repeat
+        fade_perc=min(fade_perc+_spd,1)
+        fade_screen()
+        flip()
+    until fade_perc==1
+    wait(_wait)
 end
 
 -->8
@@ -434,6 +476,8 @@ function check_plr_death()
     if plr.hp<=0 then
         update_func=update_game_over
         draw_func=draw_game_over
+        fade_out(0.02)
+        wait(60)
         return true
     end
     return false
