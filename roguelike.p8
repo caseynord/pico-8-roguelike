@@ -9,6 +9,8 @@ function _init()
     button_timer=0
     frame_timer=0
     plr_timer=0
+    
+    depalette={0,1,1,2,1,13,6,4,4,9,3,13,1,13,14}
 
     plr_anim={240,241,242,243} --indexes for plr sprite --todo: delete
     mob_anim={240,192}
@@ -17,12 +19,13 @@ function _init()
     
     x_direction={-1,1,0,0,1,1,-1,-1} --last 4 values are for diagonals
     y_direction={0,0,-1,1,-1,1,1,-1} --last 4 values are for diagonals
-    
+
     debug={}
     start_game()
 end
 
 function start_game()
+    fade_perc=1
     input_buffer=-1
 
     mob={}
@@ -40,6 +43,8 @@ function start_game()
     window={}
     float={}
     text_window=nil --this window is used for text that is dismissed with a button press
+
+    hp_window=add_window(5,5,28,13,{})
     
     update_func=update_game
     draw_func=draw_game
@@ -76,6 +81,7 @@ end
 
 function update_game_over()
     if btnp(5) then
+        fade_out()
         start_game()
     end
 end
@@ -122,6 +128,8 @@ end
 function _draw()
     draw_func()
     draw_window() --called here so that it can be used anywhere in the game
+    update_hp_window()
+    check_fade()
 
     --debugging
     cursor(4,4)
@@ -236,6 +244,43 @@ function distance(_from_x,_from_y,_to_x,_to_y)
     return sqrt(_dx*_dx+_dy*_dy)
 end
 
+function fade_screen()
+    local _p,_kmax,_col,_k=flr(mid(0,fade_perc,1)*100)
+    for j=1,15 do
+        _col=j
+        _kmax=flr((_p+(j*1.46))/22)
+        for k=1,_kmax do
+            _col=depalette[_col]
+        end
+        pal(j,_col,1)
+    end
+end
+
+function check_fade()
+    if fade_perc>0 then
+        fade_perc=max(fade_perc-0.04,0)
+        fade_screen()
+    end
+end
+
+function wait(_wait)
+    repeat
+        _wait-=1
+        flip()
+    until _wait<0
+end
+
+function fade_out(_spd,_wait)
+    if (_spd==nil) _spd=0.04
+    if (_wait==nil) _wait=0
+    repeat
+        fade_perc=min(fade_perc+_spd,1)
+        fade_screen()
+        flip()
+    until fade_perc==1
+    wait(_wait)
+end
+
 -->8
 -- gameplay --
 
@@ -347,7 +392,7 @@ function draw_window()
                 end
             end
         else
-            if text_window.button then
+            if w.button then
                 oprint8("❎",_wx+_ww-15,_wy-1+sin(button_timer*2),6,0)
             end
         end
@@ -377,6 +422,15 @@ function update_float_nums()
             del(float,f)
         end
     end
+end
+
+function update_hp_window()
+    hp_window.text[1]="♥"..plr.hp.."/"..plr.hp_max
+    local _hpy=5
+    if plr.y<8 then
+        _hpy=110
+    end
+    hp_window.y+=(_hpy-hp_window.y)/5
 end
 
 -->8
@@ -432,8 +486,11 @@ end
 
 function check_plr_death()
     if plr.hp<=0 then
+        window={} --remove any windows
         update_func=update_game_over
         draw_func=draw_game_over
+        fade_out(0.02)
+        wait(60)
         return true
     end
     return false
