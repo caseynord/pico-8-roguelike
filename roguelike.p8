@@ -43,6 +43,8 @@ function start_game()
     window={}
     float={}
     text_window=nil --this window is used for text that is dismissed with a button press
+
+    hp_window=add_window(5,5,28,13,{})
     
     update_func=update_game
     draw_func=draw_game
@@ -126,6 +128,7 @@ end
 function _draw()
     draw_func()
     draw_window() --called here so that it can be used anywhere in the game
+    update_hp_window()
     check_fade()
 
     --debugging
@@ -389,7 +392,7 @@ function draw_window()
                 end
             end
         else
-            if text_window.button then
+            if w.button then
                 oprint8("❎",_wx+_ww-15,_wy-1+sin(button_timer*2),6,0)
             end
         end
@@ -419,6 +422,15 @@ function update_float_nums()
             del(float,f)
         end
     end
+end
+
+function update_hp_window()
+    hp_window.text[1]="♥"..plr.hp.."/"..plr.hp_max
+    local _hpy=5
+    if plr.y<8 then
+        _hpy=110
+    end
+    hp_window.y+=(_hpy-hp_window.y)/5
 end
 
 -->8
@@ -474,6 +486,7 @@ end
 
 function check_plr_death()
     if plr.hp<=0 then
+        window={} --remove any windows
         update_func=update_game_over
         draw_func=draw_game_over
         fade_out(0.02)
