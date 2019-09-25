@@ -336,6 +336,7 @@ function trigger_interaction(_tile,_dest_x,_dest_y)
 end
 
 function is_walkable(_x,_y,_mode)
+    --also used as part of line of sight checking
     if _mode==nil then _mode="" end
     if in_bounds(_x,_y) then
         local _dest_tile=mget(_x,_y)
@@ -351,6 +352,46 @@ end
 
 function in_bounds(_x,_y)
     return not (_x<0 or _y<0 or _x>15 or _y>15)
+end
+
+function line_of_sight(_x1,_y1,_x2,_y2)
+    if distance(_x1,_y1,_x2,_y2)==1 then
+        return true 
+    end
+
+    local _first,_sx,_sy,_dx,_dy=true
+    if _x1<_x2 then
+        _sx=1
+        _dx=_x2-_x1
+    else
+        _sx=-1
+        _dx=_x1-_x2
+    end
+    if _y1<_y2 then
+        _sy=1
+        _dy=_y2-_y1
+    else
+        _sy=-1
+        _dy=_y1-_y2
+    end
+
+    local _err,_e2=_dx-_dy,nil
+    while not (_x1==_x2 and _y1==_y2) do
+        if not _first and is_walkable(_x1,_y1,"sight")==false then
+            return false
+        end
+        _first=false
+        _e2=_err+_err
+        if _e2>-_dy then
+            _err=_err-_dy
+            _x1=_x1+_sx
+        end
+        if _e2<_dx then
+            _err=_err+_dx
+            _y1=_y1+_sy
+        end
+    end
+    return true
 end
 
 -->8
@@ -450,7 +491,10 @@ function add_mob(_type,_mx,_my)
         flash=0,
         flp=false,
         anim_func=nil, --function ptr for loading animations
-        anim={}
+        anim={},
+        mode_func=ai_wait,
+        target_x,
+        target_y
     }
     for i=0,3 do
         add(_mob.anim,mob_anim[_type]+i)
@@ -540,33 +584,60 @@ function bump_wall(_mob,_anim_timer)
     _mob.offset_y=_mob.ini_offset_y*_timer
 end
 
+--todo: refactor (clean up m local var)
+function ai_wait(_m)
+    if line_of_sight(_m.x,_m.y,plr.x,plr.y) then
+        --aggro
+        _m.mode_func=ai_attack
+        _m.target_x,_m.target_y=plr.x,plr.y
+        add_float_num("!",_m.x*8+2,_m.y*8,10)
+    end
+end
+
+function ai_attack(_m)
+    if distance(_m.x,_m.y,plr.x,plr.y)==1 then --attack player
+        local _dx,_dy=plr.x-_m.x,plr.y-_m.y
+        mob_bump(_m,_dx,_dy)
+        hit_mob(_m,plr)
+        sfx(57)
+    else --move towards player
+        --check if player can still be seen and update target
+        if line_of_sight(_m.x,_m.y,plr.x,plr.y) then
+            _m.target_x,_m.target_y=plr.x,plr.y
+        end
+
+        local _best_dest,_bx,_by=999,0,0
+        for i=1,4 do
+            local _dx,_dy=x_direction[i],y_direction[i]
+            local _target_x,_target_y=_m.x+_dx,_m.y+_dy
+            if is_walkable(_target_x,_target_y,"checkmobs") then
+                local _distance=distance(_target_x,_target_y,_m.target_x,_m.target_y)
+                if _distance<_best_dest then
+                    _best_dest,_bx,_by=_distance,_dx,_dy
+                end
+            end
+        end
+        mob_walk(_m,_bx,_by)
+        update_func=update_ai_turn
+
+        --los check to reaquire target to make ai smarter?
+
+        --deaggro if mob has arrived at target
+        if _m.x==_m.target_x and _m.y==_m.target_y then
+            _m.mode_func=ai_wait
+            add_float_num("?",_m.x*8+2,_m.y*8,10)
+        end
+
+        plr_timer=0
+    end
+end
+
 function mob_ai()
     for m in all(mob) do
         if m!=plr then
+            debug[1]=line_of_sight(m.x,m.y,plr.x,plr.y)
             m.anim_func=nil
-            if distance(m.x,m.y,plr.x,plr.y)==1 then
-                --attack player
-                local _dx,_dy=plr.x-m.x,plr.y-m.y
-                mob_bump(m,_dx,_dy)
-                hit_mob(m,plr)
-                sfx(57)
-            else
-                --move towards player
-                local _best_dest,_bx,_by=999,0,0
-                for i=1,4 do
-                    local _dx,_dy=x_direction[i],y_direction[i]
-                    local _target_x,_target_y=m.x+_dx,m.y+_dy
-                    if is_walkable(_target_x,_target_y,"checkmobs") then
-                        local _distance=distance(_target_x,_target_y,plr.x,plr.y)
-                        if _distance<_best_dest then
-                            _best_dest,_bx,_by=_distance,_dx,_dy
-                        end
-                    end
-                end
-                mob_walk(m,_bx,_by)
-                update_func=update_ai_turn
-                plr_timer=0
-            end
+            m.mode_func(m)
         end
     end
 end
@@ -714,8 +785,8 @@ __map__
 020101010d010202020102010a01020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0201030102010101010102010101020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 02020d02020201010102020d0202020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-020301030202020d020202010202020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-02010101020a0103010102010202020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+021101110202020d020202010202020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+02010101020a0111010102010202020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0201010102010101010102010101020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 02010c0102020202020d02020201020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0201010102060101010101010101020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
