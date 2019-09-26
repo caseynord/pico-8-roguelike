@@ -63,6 +63,7 @@ function _update60()
     frame_timer+=1
     update_func()
     update_float_nums() --called here so that it is always updating
+    update_hp_window()
 end
 
 function update_game()
@@ -128,7 +129,6 @@ end
 function _draw()
     draw_func()
     draw_window() --called here so that it can be used anywhere in the game
-    update_hp_window()
     check_fade()
 
     --debugging
