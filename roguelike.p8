@@ -99,7 +99,7 @@ function update_plr_turn()
     if plr_timer==1 then
         update_func=update_game
         if not check_plr_death() then
-            mob_ai()
+            update_mob_ai()
         end
     end
 end
@@ -591,7 +591,9 @@ function ai_wait(_m)
         _m.mode_func=ai_attack
         _m.target_x,_m.target_y=plr.x,plr.y
         add_float_num("!",_m.x*8+2,_m.y*8,10)
+        return true
     end
+    return false
 end
 
 function ai_attack(_m)
@@ -600,6 +602,7 @@ function ai_attack(_m)
         mob_bump(_m,_dx,_dy)
         hit_mob(_m,plr)
         sfx(57)
+        return true
     else --move towards player
         --check if player can still be seen and update target
         if line_of_sight(_m.x,_m.y,plr.x,plr.y) then
@@ -618,7 +621,6 @@ function ai_attack(_m)
             end
         end
         mob_walk(_m,_bx,_by)
-        update_func=update_ai_turn
 
         --los check to reaquire target to make ai smarter?
 
@@ -627,18 +629,23 @@ function ai_attack(_m)
             _m.mode_func=ai_wait
             add_float_num("?",_m.x*8+2,_m.y*8,10)
         end
-
-        plr_timer=0
+        return true
     end
+    return false
 end
 
-function mob_ai()
+function update_mob_ai()
+    local _moving=false
     for m in all(mob) do
         if m!=plr then
             debug[1]=line_of_sight(m.x,m.y,plr.x,plr.y)
             m.anim_func=nil
-            m.mode_func(m)
+            moving=m.mode_func(m)
         end
+    end
+    if moving then
+        update_func=update_ai_turn
+        plr_timer=0
     end
 end
 
