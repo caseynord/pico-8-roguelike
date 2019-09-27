@@ -48,6 +48,7 @@ function start_game()
 
     window={}
     float={}
+    fog=empty_map(1)
     text_window=nil --this window is used for text that is dismissed with a button press
 
     hp_window=add_window(5,5,28,13,{})
@@ -174,6 +175,14 @@ function draw_game()
     --draw player after mobs so they are always on top
     draw_mob(plr)
 
+    for x=0,15 do
+        for y=0,15 do
+            if fog[x][y]==1 then
+               rectfill2(x*8,y*8,8,8,0)
+            end
+        end
+    end
+
     for f in all(float) do
         oprint8(f.text,f.x,f.y,f.col,0)
     end
@@ -287,6 +296,29 @@ function fade_out(_spd,_wait)
     wait(_wait)
 end
 
+function empty_map(_default)
+    local _return_arr={}
+    if (_default==nil) _default=0
+
+    for x=0,15 do
+        _return_arr[x]={0}
+        for y=0,15 do
+            _return_arr[x][y]=_default
+        end
+    end
+    return _return_arr
+end
+
+function unfog()
+    for x=0,15 do
+        for y=0,15 do
+            if line_of_sight(plr.x,plr.y,x,y) then
+                fog[x][y]=0
+            end
+        end
+    end
+end
+
 -->8
 -- gameplay --
 
@@ -316,6 +348,7 @@ function move_player(_dx,_dy)
             hit_mob(plr,_mob)
         end
     end
+    unfog()
 end
 
 function trigger_interaction(_tile,_dest_x,_dest_y)
